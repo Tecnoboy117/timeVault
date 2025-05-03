@@ -3,12 +3,11 @@
 import { useState, useEffect, useRef } from 'react';
 import { useWalletSession } from '../hooks/useWalletSession';
 import Image from 'next/image';
+import { storeFile, listUploads, type FileMetadata, verifyUpload } from '../utils/ipfs';
 
-interface UploadedFile {
-  name: string;
-  type: string;
-  size: number;
-  uploadDate: Date;
+// Update the UploadedFile interface
+interface UploadedFile extends FileMetadata {
+  cid: string;
 }
 
 export default function Home() {
@@ -17,6 +16,9 @@ export default function Home() {
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedFileInfo, setSelectedFileInfo] = useState<UploadedFile | null>(null);
+  const [isUploading, setIsUploading] = useState(false);
+  const [uploadSuccess, setUploadSuccess] = useState(false);
+  const [uploadError, setUploadError] = useState<string | null>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
   
   const { isConnected, address, connectWallet, disconnectWallet } = useWalletSession();
@@ -68,26 +70,63 @@ export default function Home() {
     }
   }, [disconnectWallet]);
 
-  const handleUpload = async () => {
-    if (!selectedFile || !isConnected) {
-      alert('Please connect your wallet and select a file first!');
-      return;
-    }
-
-    // Add the file to our uploaded files list
-    const newFile: UploadedFile = {
-      name: selectedFile.name,
-      type: selectedFile.type || 'unknown',
-      size: selectedFile.size,
-      uploadDate: new Date(),
+  // Add new useEffect to load files on component mount
+  useEffect(() => {
+    const loadFiles = async () => {
+      if (isConnected && address) {
+        try {
+          console.log('Cargando archivos para:', address);
+          const files = await listUploads(address);
+          setUploadedFiles(files);
+          console.log('Archivos cargados:', files.length);
+        } catch (error) {
+          console.error('Error loading files:', error);
+        }
+      } else {
+        // Limpiar los archivos si no hay wallet conectada
+        setUploadedFiles([]);
+      }
     };
 
-    setUploadedFiles(prev => [...prev, newFile]);
-    setSelectedFile(null); // Reset file input
-    
-    // Clear the file input
-    const fileInput = document.querySelector('input[type="file"]') as HTMLInputElement;
-    if (fileInput) fileInput.value = '';
+    // Cargar archivos inicialmente
+    loadFiles();
+
+    // Configurar intervalo para actualizar la lista cada 30 segundos
+    const interval = setInterval(loadFiles, 30000);
+
+    // Limpiar intervalo al desmontar
+    return () => clearInterval(interval);
+  }, [isConnected, address]);
+
+  // Update handleUpload to refresh the list after upload
+  const handleUpload = async () => {
+    if (!selectedFile || !isConnected || !address) return;
+
+    try {
+      setIsUploading(true);
+      setUploadError(null);
+
+      await storeFile(selectedFile, address);
+      
+      // Recargar la lista completa después de subir
+      const updatedFiles = await listUploads(address);
+      setUploadedFiles(updatedFiles);
+      setUploadSuccess(true);
+
+      // Limpiar el input
+      setSelectedFile(null);
+      const fileInput = document.querySelector('input[type="file"]') as HTMLInputElement;
+      if (fileInput) fileInput.value = '';
+
+      // Ocultar el mensaje de éxito después de 3 segundos
+      setTimeout(() => setUploadSuccess(false), 3000);
+
+    } catch (error) {
+      console.error('Error uploading file:', error);
+      setUploadError(error instanceof Error ? error.message : 'Error desconocido');
+    } finally {
+      setIsUploading(false);
+    }
   };
 
   const handleFileClick = (file: UploadedFile) => {
@@ -95,14 +134,24 @@ export default function Home() {
     setIsModalOpen(true);
   };
 
-  const handleDownload = (file: UploadedFile) => {
-    // Aquí iría la lógica de descarga del archivo
-    const link = document.createElement('a');
-    link.href = URL.createObjectURL(new Blob(['contenido del archivo']));
-    link.download = file.name;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+  const handleDownload = async (file: UploadedFile) => {
+    try {
+      const response = await fetch(`https://${file.cid}.ipfs.dweb.link`);
+      const blob = await response.blob();
+      
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = file.name;
+      
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
+    } catch (error) {
+      console.error('Error downloading file:', error);
+      // TODO: Add error handling UI
+    }
   };
 
   const handleCloseModal = () => {
@@ -198,7 +247,7 @@ export default function Home() {
                   className="baul-button w-full sm:w-auto px-6 py-2 rounded-lg font-semibold inline-flex items-center justify-center"
                   disabled={!selectedFile || !isConnected}
                 >
-                  Subir
+                  {isUploading ? 'Subiendo...' : 'Subir'}
                 </button>
               </div>
             </form>
@@ -292,6 +341,41 @@ export default function Home() {
                   Descargar Archivo
                 </button>
               </div>
+            </div>
+          </div>
+        )}
+
+        {/* Upload Status Notifications */}
+        {isUploading && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+            <div className="bg-white p-6 rounded-lg shadow-xl">
+              <div className="flex flex-col items-center space-y-4">
+                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#40E0D0]"></div>
+                <p className="text-[#001A1A]">Subiendo archivo...</p>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {uploadSuccess && (
+          <div className="fixed bottom-4 right-4 bg-green-500 text-white px-6 py-3 rounded-lg shadow-lg">
+            <div className="flex items-center space-x-2">
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+              </svg>
+              <span>¡Archivo subido exitosamente!</span>
+            </div>
+          </div>
+        )}
+
+        {/* Add error notification */}
+        {uploadError && (
+          <div className="fixed bottom-4 right-4 bg-red-500 text-white px-6 py-3 rounded-lg shadow-lg">
+            <div className="flex items-center space-x-2">
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+              <span>{uploadError}</span>
             </div>
           </div>
         )}
