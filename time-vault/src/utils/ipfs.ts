@@ -55,9 +55,9 @@ export async function storeFile(file: File, address: string): Promise<FileMetada
   }
 }
 
-export async function listUploads(address: string): Promise<FileMetadata[]> {
+export async function listUploads(): Promise<FileMetadata[]> {
   try {
-    console.log('Obteniendo lista de archivos desde Pinata...');
+    console.log('Obteniendo lista global de archivos desde Pinata...');
     
     const res = await axios.get(`${PINATA_API_URL}/data/pinList?status=pinned`, {
       headers: {
@@ -67,22 +67,18 @@ export async function listUploads(address: string): Promise<FileMetadata[]> {
 
     console.log('Respuesta de Pinata:', res.data);
 
-    // Filtrar y mapear los archivos que pertenecen al usuario
-    const userFiles = res.data.rows
-      .filter((pin: any) => 
-        pin.metadata?.keyvalues?.owner?.toLowerCase() === address?.toLowerCase()
-      )
-      .map((pin: any) => ({
-        name: pin.metadata?.name || 'Unknown',
-        type: pin.metadata?.keyvalues?.type || 'Unknown',
-        size: Number(pin.metadata?.keyvalues?.size) || 0,
-        uploadDate: pin.metadata?.keyvalues?.uploadDate || new Date().toISOString(),
-        cid: pin.ipfs_pin_hash,
-        owner: pin.metadata?.keyvalues?.owner || 'Unknown'
-      }));
+    // Mapear todos los archivos sin filtrar por dirección
+    const allFiles = res.data.rows.map((pin: any) => ({
+      name: pin.metadata?.name || 'Unknown',
+      type: pin.metadata?.keyvalues?.type || 'Unknown',
+      size: Number(pin.metadata?.keyvalues?.size) || 0,
+      uploadDate: pin.metadata?.keyvalues?.uploadDate || new Date().toISOString(),
+      cid: pin.ipfs_pin_hash,
+      owner: pin.metadata?.keyvalues?.owner || 'Unknown'
+    }));
 
-    console.log('Archivos filtrados del usuario:', userFiles);
-    return userFiles;
+    console.log('Total archivos encontrados:', allFiles.length);
+    return allFiles;
   } catch (error) {
     console.error('Error listando archivos:', error);
     return [];

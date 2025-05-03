@@ -73,18 +73,13 @@ export default function Home() {
   // Add new useEffect to load files on component mount
   useEffect(() => {
     const loadFiles = async () => {
-      if (isConnected && address) {
-        try {
-          console.log('Cargando archivos para:', address);
-          const files = await listUploads(address);
-          setUploadedFiles(files);
-          console.log('Archivos cargados:', files.length);
-        } catch (error) {
-          console.error('Error loading files:', error);
-        }
-      } else {
-        // Limpiar los archivos si no hay wallet conectada
-        setUploadedFiles([]);
+      try {
+        console.log('Cargando todos los archivos...');
+        const files = await listUploads();
+        setUploadedFiles(files);
+        console.log('Archivos cargados:', files.length);
+      } catch (error) {
+        console.error('Error loading files:', error);
       }
     };
 
@@ -96,7 +91,7 @@ export default function Home() {
 
     // Limpiar intervalo al desmontar
     return () => clearInterval(interval);
-  }, [isConnected, address]);
+  }, []); // Remove address and isConnected from dependencies
 
   // Update handleUpload to refresh the list after upload
   const handleUpload = async () => {
@@ -109,7 +104,7 @@ export default function Home() {
       await storeFile(selectedFile, address);
       
       // Recargar la lista completa después de subir
-      const updatedFiles = await listUploads(address);
+      const updatedFiles = await listUploads();
       setUploadedFiles(updatedFiles);
       setUploadSuccess(true);
 
@@ -273,6 +268,9 @@ export default function Home() {
                       <p className="text-sm text-[#001A1A]/70">Tipo: {file.type}</p>
                       <p className="text-sm text-[#001A1A]/70">
                         Tamaño: {(file.size / 1024).toFixed(2)} KB
+                      </p>
+                      <p className="text-sm text-[#001A1A]/70">
+                        Subido por: {file.owner.slice(0, 6)}...{file.owner.slice(-4)}
                       </p>
                     </div>
                   </div>
