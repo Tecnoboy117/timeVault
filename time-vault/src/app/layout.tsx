@@ -1,9 +1,6 @@
-import "../styles/globals.css";
-
-export const metadata = {
-  title: "TimeVault",
-  description: "Plataforma de preservación digital retro",
-};
+import type { Metadata } from "next";
+import { Inter } from "next/font/google";
+import "./globals.css";
 
 export default function RootLayout({
   children,

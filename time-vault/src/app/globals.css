@@ -1,0 +1,75 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --turquoise: #40E0D0;
+  --dark-teal: #001A1A;
+  --golden: #FFA500;
+  --white: #FFFFFF;
+}
+
+body {
+  background-color: var(--bg-dark);
+  color: var(--turquoise);
+  font-family: 'Courier New', Courier, monospace;
+}
+
+.retro-container {
+  background: linear-gradient(rgba(0, 26, 26, 0.9), rgba(0, 26, 26, 0.95));
+  border: 1px solid var(--turquoise);
+  box-shadow: 0 0 10px var(--turquoise), inset 0 0 5px var(--turquoise);
+}
+
+.retro-button {
+  background: transparent;
+  border: 1px solid var(--turquoise);
+  color: var(--turquoise);
+  text-shadow: var(--text-glow);
+  box-shadow: 0 0 5px var(--turquoise);
+  transition: all 0.3s ease;
+}
+
+.retro-button:hover {
+  background: var(--turquoise);
+  color: var(--bg-dark);
+  box-shadow: 0 0 15px var(--turquoise);
+}
+
+.retro-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.retro-input {
+  background: rgba(0, 26, 26, 0.8);
+  border: 1px solid var(--turquoise);
+  color: var(--cream);
+  text-shadow: var(--text-glow);
+}
+
+.crt-effect {
+  background-color: var(--bg-dark);
+  color: var(--turquoise);
+  font-family: 'Courier New', Courier, monospace;
+}
+
+.file-icon {
+  color: var(--golden);
+}
+
+.baul-button {
+  background-color: var(--turquoise);
+  color: var(--dark-teal);
+  transition: all 0.2s ease;
+}
+
+.baul-button:hover {
+  opacity: 0.9;
+  transform: translateY(-1px);
+}
+
+.baul-container {
+  border: 2px solid var(--turquoise);
+  background-color: var(--white);
+}
