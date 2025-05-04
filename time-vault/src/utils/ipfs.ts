@@ -1,6 +1,23 @@
 import axios from 'axios';
 
 const PINATA_API_URL = 'https://api.pinata.cloud';
+const PINATA_JWT = process.env.NEXT_PUBLIC_PINATA_JWT;
+
+// Add this function to test the token
+async function testPinataConnection() {
+  try {
+    const response = await axios.get(`${PINATA_API_URL}/data/testAuthentication`, {
+      headers: {
+        'Authorization': `Bearer ${PINATA_JWT}`
+      }
+    });
+    console.log('Pinata connection successful:', response.data);
+    return true;
+  } catch (error) {
+    console.error('Pinata authentication error:', error);
+    return false;
+  }
+}
 
 export interface FileMetadata {
   name: string;
@@ -13,12 +30,18 @@ export interface FileMetadata {
 
 export async function storeFile(file: File, address: string): Promise<FileMetadata> {
   try {
+    // Test connection first
+    const isConnected = await testPinataConnection();
+    if (!isConnected) {
+      throw new Error('No se pudo autenticar con Pinata');
+    }
+
     console.log('Preparando archivo para subir:', file.name);
+    console.log('Using JWT:', PINATA_JWT?.substring(0, 20) + '...');
 
     const formData = new FormData();
     formData.append('file', file);
 
-    // Add metadata to Pinata
     const metadata = {
       name: file.name,
       keyvalues: {
@@ -31,12 +54,17 @@ export async function storeFile(file: File, address: string): Promise<FileMetada
 
     formData.append('pinataMetadata', JSON.stringify(metadata));
 
-    const res = await axios.post(`${PINATA_API_URL}/pinning/pinFileToIPFS`, formData, {
-      headers: {
-        'Content-Type': 'multipart/form-data',
-        'Authorization': `Bearer ${process.env.NEXT_PUBLIC_PINATA_JWT}`
+    const res = await axios.post(
+      `${PINATA_API_URL}/pinning/pinFileToIPFS`,
+      formData,
+      {
+        headers: {
+          'Content-Type': `multipart/form-data;`,
+          'Authorization': `Bearer ${PINATA_JWT}`
+        },
+        maxBodyLength: Infinity
       }
-    });
+    );
 
     const cid = res.data.IpfsHash;
     console.log('CID recibido:', cid);

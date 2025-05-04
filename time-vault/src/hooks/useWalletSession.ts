@@ -1,52 +1,89 @@
 import { useState, useEffect } from 'react';
-
-interface WalletSession {
-  isConnected: boolean;
-  address: string;
-}
+import { ethers } from 'ethers';
 
 export const useWalletSession = () => {
-  const [session, setSession] = useState<WalletSession>(() => {
-    // Intentar recuperar la sesión del localStorage al iniciar
-    if (typeof window !== 'undefined') {
-      const saved = localStorage.getItem('walletSession');
-      if (saved) {
-        return JSON.parse(saved);
-      }
-    }
-    return { isConnected: false, address: '' };
-  });
+  const [isConnected, setIsConnected] = useState(false);
+  const [address, setAddress] = useState('');
+  const [provider, setProvider] = useState<ethers.providers.Web3Provider | null>(null);
 
-  // Actualizar localStorage cuando cambia la sesión
   useEffect(() => {
-    localStorage.setItem('walletSession', JSON.stringify(session));
-  }, [session]);
+    const initProvider = async () => {
+      try {
+        // Check if running in browser and MetaMask is installed
+        if (typeof window !== 'undefined' && window.ethereum) {
+          const web3Provider = new ethers.providers.Web3Provider(window.ethereum);
+          setProvider(web3Provider);
+
+          // Check if already connected
+          const accounts = await web3Provider.listAccounts();
+          if (accounts.length > 0) {
+            setAddress(accounts[0]);
+            setIsConnected(true);
+          }
+        }
+      } catch (error) {
+        console.error('Error initializing provider:', error);
+      }
+    };
+
+    initProvider();
+
+    // Listen for account changes
+    const handleAccountsChanged = (accounts: string[]) => {
+      if (accounts.length === 0) {
+        disconnectWallet();
+      } else {
+        setAddress(accounts[0]);
+        setIsConnected(true);
+      }
+    };
+
+    if (window.ethereum) {
+      window.ethereum.on('accountsChanged', handleAccountsChanged);
+      return () => {
+        window.ethereum?.removeListener('accountsChanged', handleAccountsChanged);
+      };
+    }
+  }, []);
 
   const connectWallet = async () => {
-    if (typeof window.ethereum !== 'undefined') {
-      try {
-        const accounts = await window.ethereum.request({ method: 'eth_requestAccounts' });
-        setSession({ isConnected: true, address: accounts[0] });
-        return true;
-      } catch (error) {
-        console.error('Error connecting wallet:', error);
-        return false;
+    try {
+      if (!window.ethereum) {
+        throw new Error('MetaMask not installed');
       }
-    } else {
-      alert('Please install MetaMask or another Web3 wallet!');
+
+      if (!provider) {
+        throw new Error('Provider not initialized');
+      }
+
+      // Request account access
+      const accounts = await window.ethereum.request({ 
+        method: 'eth_requestAccounts' 
+      });
+      
+      if (accounts && accounts.length > 0) {
+        setAddress(accounts[0]);
+        setIsConnected(true);
+        return true;
+      }
+      
+      return false;
+    } catch (error) {
+      console.error('Error connecting wallet:', error);
       return false;
     }
   };
 
   const disconnectWallet = () => {
-    setSession({ isConnected: false, address: '' });
-    localStorage.removeItem('walletSession');
+    setIsConnected(false);
+    setAddress('');
   };
 
   return {
-    isConnected: session.isConnected,
-    address: session.address,
+    isConnected,
+    address,
     connectWallet,
-    disconnectWallet
+    disconnectWallet,
+    provider
   };
 };
